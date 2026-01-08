@@ -1,0 +1,84 @@
+
+.home-container {
+    min-height: 100vh;
+    padding: 2rem;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    background: linear-gradient(135deg, #2c3e50 0%, #4ca1af 100%);
+    font-family: 'Inter', sans-serif;
+    color: white;
+}
+
+.glass-panel {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(15px);
+    -webkit-backdrop-filter: blur(15px);
+    border-radius: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    padding: 2rem;
+    width: 100%;
+    max-width: 500px;
+    text-align: center;
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+}
+
+header h2 {
+    margin-top: 0;
+    font-size: 2rem;
+}
+
+.scanner-wrapper {
+    margin: 2rem 0;
+    background: rgba(0,0,0,0.2);
+    border-radius: 10px;
+    padding: 1rem;
+    min-height: 300px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+}
+
+#reader {
+    width: 100%;
+}
+
+.btn-scan {
+    background: linear-gradient(45deg, #11998e, #38ef7d);
+    border: none;
+    padding: 15px 30px;
+    border-radius: 50px;
+    color: white;
+    font-weight: bold;
+    font-size: 1.2rem;
+    cursor: pointer;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    transition: transform 0.2s;
+}
+
+.btn-scan:hover {
+    transform: scale(1.05);
+}
+
+.btn-debug {
+    margin-top: 2rem;
+    background: transparent;
+    border: 1px dashed rgba(255,255,255,0.3);
+    color: rgba(255,255,255,0.5);
+    padding: 10px;
+    cursor: pointer;
+}
+
+.message-box {
+    margin-top: 1rem;
+    min-height: 50px;
+}
+
+.result-text {
+    font-size: 1.2rem;
+    white-space: pre-line;
+    background: rgba(255,255,255,0.2);
+    padding: 1rem;
+    border-radius: 10px;
+}
