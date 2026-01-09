@@ -333,6 +333,103 @@ const ReporteLiquidacion = ({ empleados, asistencias, refreshData }) => {
     );
 };
 
+// ... (previous components)
+
+const CrudAsistencias = ({ asistencias, empleados, refreshData }) => {
+    const [editingId, setEditingId] = useState(null);
+    const [editFecha, setEditFecha] = useState('');
+    const [editIngreso, setEditIngreso] = useState('');
+    const [editSalida, setEditSalida] = useState('');
+
+    const startEdit = (asis) => {
+        setEditingId(asis.id);
+        setEditFecha(asis.fecha);
+        // Truncate seconds for time input compatibility if needed, though browsers verify support.
+        // Django sends HH:MM:SS. Input type='time' usually takes HH:MM.
+        setEditIngreso(asis.hora_ingreso ? asis.hora_ingreso.substring(0,5) : ''); 
+        setEditSalida(asis.hora_salida ? asis.hora_salida.substring(0,5) : '');
+    };
+
+    const saveEdit = async () => {
+        try {
+            await api.patch(`asistencias/${editingId}/`, {
+                fecha: editFecha,
+                hora_ingreso: editIngreso, // API should handle HH:MM adding :00 if needed or accept it
+                hora_salida: editSalida || null
+            });
+            setEditingId(null);
+            refreshData();
+        } catch (error) {
+            alert("Error actualizando asistencia");
+            console.error(error);
+        }
+    };
+
+    const handleDelete = async (id) => {
+        if(window.confirm("¿Eliminar este registro de asistencia?")) {
+            try {
+                await api.delete(`asistencias/${id}/`);
+                refreshData();
+            } catch (err) { alert("Error al eliminar"); }
+        }
+    }
+
+    return (
+        <div>
+            <h3>Gestionar Asistencias (Entradas/Salidas)</h3>
+            <div className="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Empleado</th>
+                            <th>Fecha</th>
+                            <th>Entrada</th>
+                            <th>Salida</th>
+                            <th>Horas</th>
+                            <th>Monto</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {asistencias.map(a => (
+                            <tr key={a.id} style={{backgroundColor: editingId===a.id ? '#fdfdcb' : 'transparent'}}>
+                                <td>{a.id}</td>
+                                <td>{a.empleado_nombre}</td>
+                                
+                                {editingId === a.id ? (
+                                    <>
+                                        <td><input type="date" value={editFecha} onChange={e=>setEditFecha(e.target.value)} /></td>
+                                        <td><input type="time" value={editIngreso} onChange={e=>setEditIngreso(e.target.value)} /></td>
+                                        <td><input type="time" value={editSalida} onChange={e=>setEditSalida(e.target.value)} /></td>
+                                        <td colSpan="2">Calculado al guardar</td>
+                                        <td>
+                                            <button className="action-btn" onClick={saveEdit} style={{backgroundColor:'#28a745'}}>Guardar</button>
+                                            <button className="action-btn" onClick={()=>setEditingId(null)} style={{backgroundColor:'#6c757d'}}>Cancelar</button>
+                                        </td>
+                                    </>
+                                ) : (
+                                    <>
+                                        <td>{a.fecha}</td>
+                                        <td>{a.hora_ingreso}</td>
+                                        <td>{a.hora_salida || <span style={{color:'red', fontWeight:'bold'}}>SIN SALIDA</span>}</td>
+                                        <td>{a.horas_trabajadas}</td>
+                                        <td>{a.monto_total}</td>
+                                        <td>
+                                            <button className="action-btn" onClick={()=>startEdit(a)}>Editar</button>
+                                            <button className="action-btn btn-delete" onClick={()=>handleDelete(a.id)}>Borrar</button>
+                                        </td>
+                                    </>
+                                )}
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    );
+};
+
 // --- MAIN DASHBOARD ---
 
 const AdminDashboard = () => {
@@ -346,6 +443,7 @@ const AdminDashboard = () => {
     }, []);
 
     const fetchData = async () => {
+
         try {
             const [asistRes, emplRes, cargoRes] = await Promise.all([
                 api.get('asistencias/'),
@@ -373,12 +471,14 @@ const AdminDashboard = () => {
 
             <div className="tabs">
                 <button className={`tab-btn ${tab==='liquidacion'?'active':''}`} onClick={()=>setTab('liquidacion')}>💵 Liquidación</button>
+                <button className={`tab-btn ${tab==='asistencias'?'active':''}`} onClick={()=>setTab('asistencias')}>⏱️ Asistencias</button>
                 <button className={`tab-btn ${tab==='empleados'?'active':''}`} onClick={()=>setTab('empleados')}>👨‍🍳 Empleados</button>
                 <button className={`tab-btn ${tab==='cargos'?'active':''}`} onClick={()=>setTab('cargos')}>💰 Cargos</button>
             </div>
 
             <div className="dashboard-content">
                 {tab === 'liquidacion' && <ReporteLiquidacion empleados={empleados} asistencias={asistencias} refreshData={fetchData} />}
+                {tab === 'asistencias' && <CrudAsistencias asistencias={asistencias} empleados={empleados} refreshData={fetchData} />}
                 {tab === 'empleados' && <CrudEmpleados empleados={empleados} cargos={cargos} refreshData={fetchData} />}
                 {tab === 'cargos' && <CrudCargos cargos={cargos} refreshData={fetchData} />}
             </div>
