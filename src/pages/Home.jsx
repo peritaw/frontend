@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Html5QrcodeScanner } from 'html5-qrcode';
 import api from '../api';
 import './Home.css';
@@ -8,17 +8,57 @@ const Home = () => {
     const [message, setMessage] = useState('');
     const username = localStorage.getItem('username');
     const [scanning, setScanning] = useState(false);
+    const scannerRef = useRef(null);
+    const isProcessingRef = useRef(false);
+
+    useEffect(() => {
+        // Cleanup on unmount
+        return () => {
+            if (scannerRef.current) {
+                try {
+                    scannerRef.current.clear();
+                } catch (e) {
+                    console.error("Error clearing scanner on unmount", e);
+                }
+            }
+        };
+    }, []);
 
     const onScanSuccess = async (decodedText, decodedResult) => {
-        // Assume QR contains "PUERTA_ACCESO_CAFETERIA"
+        if (isProcessingRef.current) return;
+        
         console.log("Scanned:", decodedText);
         if (decodedText === "PUERTA_ACCESO_CAFETERIA") {
-            // Stop scanning to prevent multiple hits? 
-            // html5-qrcode continues scanning. We can clear it or just ignore subsequent.
-            // Ideally we pause.
-            handleAttendance();
+            isProcessingRef.current = true;
+            
+            // Stop scanning immediately
+            if (scannerRef.current) {
+                try {
+                    await scannerRef.current.clear();
+                    setScanning(false);
+                } catch (e) {
+                    console.error("Error clearing scanner", e);
+                }
+            }
+
+            setMessage("⏳ Procesando...");
+            await handleAttendance();
+            
+            // Allow scanning again after a delay or just by user action
+            isProcessingRef.current = false;
         } else {
-             setMessage("QR Inválido para acceso: " + decodedText);
+             // Optional: Don't stop for invalid QR, just warn
+             // But to be safe against loops, better to stop or throttle.
+             // We'll just show a message and keep scanning or stop?
+             // Let's stop to avoid confusion.
+             if (scannerRef.current) {
+                try {
+                    await scannerRef.current.clear();
+                    setScanning(false);
+                } catch(e){}
+             }
+             setMessage("❌ QR Inválido. Escaneaste: " + decodedText);
+             isProcessingRef.current = false;
         }
     };
 
@@ -27,25 +67,39 @@ const Home = () => {
     };
     
     const startScanner = () => {
+         setMessage(""); // Clear previous messages
          setScanning(true);
-         // Use timeout to ensure DOM element exists
+         isProcessingRef.current = false;
+
          setTimeout(() => {
+             // If a scanner instance already exists, clear it first
+             if (scannerRef.current) {
+                 try { scannerRef.current.clear(); } catch(e){}
+             }
+
              const scanner = new Html5QrcodeScanner(
                 "reader",
-                { fps: 10, qrbox: { width: 250, height: 250 } },
+                { 
+                    fps: 10, 
+                    qrbox: { width: 250, height: 250 },
+                    videoConstraints: { facingMode: "environment" } 
+                },
                 /* verbose= */ false);
+            
+            scannerRef.current = scanner;
             scanner.render(onScanSuccess, onScanFailure);
          }, 100);
     };
 
     const handleAttendance = async () => {
         try {
+            // Note: We send username just in case, but backend uses Token now.
             const response = await api.post('asistencias/registrar_scan/', { username });
             const { status, data } = response.data;
             if (status === 'entrada') {
-                setMessage(`✅ ¡Bienvenido! Hora de ingreso: ${data.hora_ingreso}`);
+                setMessage(`✅ ¡Bienvenido! \n🕒 Hora de ingreso: ${data.hora_ingreso}`);
             } else {
-                setMessage(`👋 ¡Hasta luego! Hora de salida: ${data.hora_salida}. \n⏱️ Horas: ${data.horas_trabajadas}. \n💰 A cobrar: $${data.monto_total}`);
+                setMessage(`👋 ¡Hasta luego! \n🕒 Hora de salida: ${data.hora_salida} \n⏱️ Horas trabajadas: ${data.horas_trabajadas} \n💰 A cobrar: $${data.monto_total}`);
             }
         } catch (error) {
             console.error(error);
@@ -75,9 +129,11 @@ const Home = () => {
                 </div>
                 
                 {/* Fallback for testing without camera */}
+                {!scanning && (
                 <button onClick={() => handleAttendance()} className="btn-debug">
                     (Simular Escaneo)
                 </button>
+                )}
             </div>
         </div>
     );
