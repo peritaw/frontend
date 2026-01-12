@@ -132,9 +132,9 @@ const Home = () => {
                 
                 {/* Fallback for testing without camera */}
                 {!scanning && (
-                // <button onClick={() => handleAttendance()} className="btn-debug">
-                //     (Simular Escaneo)
-                // </button>
+                <button onClick={() => handleAttendance()} className="btn-debug">
+                    (Simular Escaneo)
+                </button>
                 )}
             </div>
         </div>
