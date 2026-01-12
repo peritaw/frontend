@@ -11,7 +11,7 @@ export default defineConfig({
     host: '0.0.0.0',
     proxy: {
       '/api': {
-        target: 'http://127.0.0.1:5002', // Backend interno en la PC
+        target: 'http://127.0.0.1:8000', // Backend local
         changeOrigin: true,
         secure: false,
       }

@@ -97,9 +97,11 @@ const Home = () => {
             const response = await api.post('asistencias/registrar_scan/', { username });
             const { status, data } = response.data;
             if (status === 'entrada') {
-                setMessage(`✅ ¡Bienvenido! \n🕒 Hora de ingreso: ${data.hora_ingreso}`);
+                const time = data.hora_ingreso ? data.hora_ingreso.substring(0, 5) : '';
+                setMessage(`✅ ¡Bienvenido! \n🕒 Hora de ingreso: ${time}`);
             } else {
-                setMessage(`👋 ¡Hasta luego! \n🕒 Hora de salida: ${data.hora_salida} \n⏱️ Horas trabajadas: ${data.horas_trabajadas} \n💰 A cobrar: $${data.monto_total}`);
+                const time = data.hora_salida ? data.hora_salida.substring(0, 5) : '';
+                setMessage(`👋 ¡Hasta luego! \n🕒 Hora de salida: ${time} \n⏱️ Horas trabajadas: ${data.horas_trabajadas}`);
             }
         } catch (error) {
             console.error(error);

@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api';
 
@@ -9,6 +9,13 @@ const Login = () => {
 
     const [error, setError] = useState('');
     const navigate = useNavigate();
+
+    useEffect(() => {
+        localStorage.removeItem('token');
+        localStorage.removeItem('username');
+        localStorage.removeItem('is_superuser');
+        delete api.defaults.headers.common['Authorization'];
+    }, []);
 
     const handleLogin = async (e) => {
         e.preventDefault();

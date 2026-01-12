@@ -169,43 +169,42 @@ const CrudEmpleados = ({ empleados, cargos, refreshData }) => {
 };
 
 const ReporteLiquidacion = ({ empleados, asistencias, refreshData }) => {
+    // --- ReporteLiquidacion: Now handles its own data fetching ---
     const [selectedEmp, setSelectedEmp] = useState('');
     const [fechaDesde, setFechaDesde] = useState('');
     const [fechaHasta, setFechaHasta] = useState('');
     const [registrosFiltrados, setRegistrosFiltrados] = useState([]);
     const [totalPagar, setTotalPagar] = useState(0);
 
-    useEffect(() => {
-        // Auto-calculate on filter change
+    const buscarLiquidacion = async () => {
         if (selectedEmp && fechaDesde && fechaHasta) {
-            const filtered = asistencias.filter(a => {
-                const isEmpleado = a.empleado.toString() === selectedEmp.toString(); // API might return int or obj? Serializer returns obj ID usually or we flattened it.
-                // Wait, AsistenciaSerializer returns keys? Let's check view/response. Usually FK is ID by default unless nested. 
-                // We used default ModelSerializer, so 'empleado' is the ID (integer). 
-                // But let's verify if user selects from dropdown (values are strings usually).
+            try {
+                // Fetch ALL matching unpaid records for calculation (using large page size or filtering)
+                // Since we added pagination, we need to request "all for this filter".
+                // Ideally backend should support ?no_page=true or large limit.
+                // For now asking for page_size=1000 to cover typical month.
+                const res = await api.get(`asistencias/?empleado=${selectedEmp}&fecha_start=${fechaDesde}&fecha_end=${fechaHasta}&pagado=false&page_size=1000`);
                 
-                const fechaAsis = new Date(a.fecha);
-                const desde = new Date(fechaDesde);
-                const hasta = new Date(fechaHasta);
-                
-                // Normalizing dates for comparison (ignore time)
-                // However, input date string "YYYY-MM-DD" creates date at UTC or local? 
-                // Best to compare string values if format matches YYYY-MM-DD.
-                
-                return isEmpleado &&
-                       !a.pagado && // Only unpaid
-                       a.monto_total && // Only completed shifts
-                       a.fecha >= fechaDesde && a.fecha <= fechaHasta;
-            });
-
-            setRegistrosFiltrados(filtered);
-            const total = filtered.reduce((acc, curr) => acc + parseFloat(curr.monto_total), 0);
-            setTotalPagar(total);
+                const filtered = res.data.results; // DRF pagination structure
+                setRegistrosFiltrados(filtered);
+                const total = filtered.reduce((acc, curr) => acc + parseFloat(curr.monto_total || 0), 0);
+                setTotalPagar(total);
+            } catch (error) {
+                console.error("Error buscando liquidacion", error);
+            }
         } else {
-            setRegistrosFiltrados([]);
-            setTotalPagar(0);
+             setRegistrosFiltrados([]);
+             setTotalPagar(0);
         }
-    }, [selectedEmp, fechaDesde, fechaHasta, asistencias]);
+    };
+    
+    // Auto-search when filters change
+    useEffect(() => {
+        const timer = setTimeout(() => {
+             buscarLiquidacion();
+        }, 500); // Debounce
+        return () => clearTimeout(timer);
+    }, [selectedEmp, fechaDesde, fechaHasta]);
 
     const handleLiquidar = async () => {
         if(registrosFiltrados.length === 0) return;
@@ -217,8 +216,8 @@ const ReporteLiquidacion = ({ empleados, asistencias, refreshData }) => {
             try {
                 await api.post('asistencias/pagar_empleado/', { ids });
                 alert("Liquidación exitosa");
-                refreshData(); // Refresh list to remove pagados
-                // Optional: clear filters?
+                buscarLiquidacion(); // Refresh local list
+                refreshData(); // Refresh main list if visible
             } catch (error) {
                 alert("Error al liquidar");
                 console.error(error);
@@ -282,7 +281,7 @@ const ReporteLiquidacion = ({ empleados, asistencias, refreshData }) => {
                                     {registrosFiltrados.map(r => (
                                         <tr key={r.id}>
                                             <td>{r.fecha}</td>
-                                            <td>{r.hora_ingreso} - {r.hora_salida}</td>
+                                            <td>{r.hora_ingreso?.substring(0,5)} - {r.hora_salida?.substring(0,5)}</td>
                                             <td>{r.horas_trabajadas}</td>
                                             <td>${r.monto_total}</td>
                                         </tr>
@@ -301,8 +300,9 @@ const ReporteLiquidacion = ({ empleados, asistencias, refreshData }) => {
                 </div>
             )}
 
-            <h4 style={{marginTop: '3rem'}}>Historial General</h4>
-            <div className="table-responsive">
+            <h4 style={{marginTop: '3rem'}}>Historial Reciente (Últimos movimientos)</h4>
+            {/* Displaying simple list from props (current page of main list) */}
+             <div className="table-responsive">
             <table>
                 <thead>
                     <tr>
@@ -313,7 +313,7 @@ const ReporteLiquidacion = ({ empleados, asistencias, refreshData }) => {
                     </tr>
                 </thead>
                 <tbody>
-                    {asistencias.slice(0, 15).map(asis => (
+                    {asistencias.map(asis => (
                         <tr key={asis.id}>
                             <td>{asis.empleado_nombre}</td>
                             <td>{asis.fecha}</td>
@@ -333,9 +333,10 @@ const ReporteLiquidacion = ({ empleados, asistencias, refreshData }) => {
     );
 };
 
-// ... (previous components)
 
-const CrudAsistencias = ({ asistencias, empleados, refreshData }) => {
+// --- CrudAsistencias with Pagination ---
+
+const CrudAsistencias = ({ asistencias, empleados, refreshData, pagination }) => {
     const [editingId, setEditingId] = useState(null);
     const [editFecha, setEditFecha] = useState('');
     const [editIngreso, setEditIngreso] = useState('');
@@ -344,8 +345,6 @@ const CrudAsistencias = ({ asistencias, empleados, refreshData }) => {
     const startEdit = (asis) => {
         setEditingId(asis.id);
         setEditFecha(asis.fecha);
-        // Truncate seconds for time input compatibility if needed, though browsers verify support.
-        // Django sends HH:MM:SS. Input type='time' usually takes HH:MM.
         setEditIngreso(asis.hora_ingreso ? asis.hora_ingreso.substring(0,5) : ''); 
         setEditSalida(asis.hora_salida ? asis.hora_salida.substring(0,5) : '');
     };
@@ -354,11 +353,11 @@ const CrudAsistencias = ({ asistencias, empleados, refreshData }) => {
         try {
             await api.patch(`asistencias/${editingId}/`, {
                 fecha: editFecha,
-                hora_ingreso: editIngreso, // API should handle HH:MM adding :00 if needed or accept it
+                hora_ingreso: editIngreso,
                 hora_salida: editSalida || null
             });
             setEditingId(null);
-            refreshData();
+            refreshData(pagination.current); // Maintain current page
         } catch (error) {
             alert("Error actualizando asistencia");
             console.error(error);
@@ -374,9 +373,68 @@ const CrudAsistencias = ({ asistencias, empleados, refreshData }) => {
         }
     }
 
+    // --- Create State ---
+    const [newEmp, setNewEmp] = useState('');
+    const [newDate, setNewDate] = useState('');
+    const [newIn, setNewIn] = useState('');
+    const [newOut, setNewOut] = useState('');
+
+    const handleCreate = async (e) => {
+        e.preventDefault();
+        try {
+            await api.post('asistencias/', {
+                empleado: newEmp,
+                fecha: newDate,
+                hora_ingreso: newIn,
+                hora_salida: newOut || null
+            });
+            setNewEmp(''); setNewDate(''); setNewIn(''); setNewOut('');
+            refreshData();
+        } catch (error) {
+            alert("Error al crear asistencia");
+            console.error(error);
+        }
+    };
+
     return (
         <div>
             <h3>Gestionar Asistencias (Entradas/Salidas)</h3>
+            
+            <div className="form-card">
+                <h4>Nueva Asistencia Manual</h4>
+                <form onSubmit={handleCreate}>
+                    <div className="form-row">
+                        <div className="form-group">
+                            <label>Empleado</label>
+                            <select value={newEmp} onChange={e=>setNewEmp(e.target.value)} required>
+                                <option value="">Seleccione...</option>
+                                {empleados.map(e => (
+                                    <option key={e.id} value={e.id}>{e.user.first_name || e.user.username}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div className="form-group">
+                            <label>Fecha</label>
+                            <input type="date" value={newDate} onChange={e=>setNewDate(e.target.value)} required />
+                        </div>
+                    </div>
+                    <div className="form-row">
+                        <div className="form-group">
+                            <label>Entrada</label>
+                            <input type="time" value={newIn} onChange={e=>setNewIn(e.target.value)} required />
+                        </div>
+                        <div className="form-group">
+                            <label>Salida (Opcional)</label>
+                            <input type="time" value={newOut} onChange={e=>setNewOut(e.target.value)} />
+                        </div>
+                    </div>
+                    <small style={{display:'block', marginBottom:'1rem', color:'#6c757d'}}>
+                        * Si la hora de salida es menor a la entrada (ej. entra 23:00, sale 02:00), el sistema asume automáticamente que es al día siguiente.
+                    </small>
+                    <button type="submit" className="btn-submit">Crear Registros</button>
+                </form>
+            </div>
+
             <div className="table-responsive">
                 <table>
                     <thead>
@@ -393,7 +451,7 @@ const CrudAsistencias = ({ asistencias, empleados, refreshData }) => {
                     </thead>
                     <tbody>
                         {asistencias.map(a => (
-                            <tr key={a.id} style={{backgroundColor: editingId===a.id ? '#fdfdcb' : 'transparent'}}>
+                            <tr key={a.id} style={{backgroundColor: editingId===a.id ? 'rgba(251, 191, 36, 0.2)' : (a.pagado ? 'rgba(16, 185, 129, 0.15)' : 'transparent')}}>
                                 <td>{a.id}</td>
                                 <td>{a.empleado_nombre}</td>
                                 
@@ -411,13 +469,18 @@ const CrudAsistencias = ({ asistencias, empleados, refreshData }) => {
                                 ) : (
                                     <>
                                         <td>{a.fecha}</td>
-                                        <td>{a.hora_ingreso}</td>
-                                        <td>{a.hora_salida || <span style={{color:'red', fontWeight:'bold'}}>SIN SALIDA</span>}</td>
+                                        <td>{a.hora_ingreso?.substring(0,5)}</td>
+                                        <td>{a.hora_salida?.substring(0,5) || <span style={{color:'red', fontWeight:'bold'}}>SIN SALIDA</span>}</td>
                                         <td>{a.horas_trabajadas}</td>
                                         <td>{a.monto_total}</td>
                                         <td>
-                                            <button className="action-btn" onClick={()=>startEdit(a)}>Editar</button>
-                                            <button className="action-btn btn-delete" onClick={()=>handleDelete(a.id)}>Borrar</button>
+                                            {!a.pagado && (
+                                                <button className="action-btn" onClick={()=>startEdit(a)}>Editar</button>
+                                            )}
+                                            {a.pagado ? 
+                                                <span className="badge-paid">PAGADO</span> : 
+                                                <button className="action-btn btn-delete" onClick={()=>handleDelete(a.id)}>Borrar</button>
+                                            }
                                         </td>
                                     </>
                                 )}
@@ -425,6 +488,13 @@ const CrudAsistencias = ({ asistencias, empleados, refreshData }) => {
                         ))}
                     </tbody>
                 </table>
+            </div>
+            
+            {/* Pagination Controls */}
+            <div className="pagination">
+                <button disabled={!pagination.previous} onClick={() => refreshData(pagination.current - 1)} className="btn-page"> Anterior </button>
+                <span> Página {pagination.current} </span>
+                <button disabled={!pagination.next} onClick={() => refreshData(pagination.current + 1)} className="btn-page"> Siguiente </button>
             </div>
         </div>
     );
@@ -434,24 +504,37 @@ const CrudAsistencias = ({ asistencias, empleados, refreshData }) => {
 
 const AdminDashboard = () => {
     const [tab, setTab] = useState('liquidacion'); 
-    const [asistencias, setAsistencias] = useState([]);
+    const [asistencias, setAsistencias] = useState([]); // This will now contain only the current page results
+    const [pagination, setPagination] = useState({ current: 1, next: null, previous: null, count: 0 });
     const [empleados, setEmpleados] = useState([]);
     const [cargos, setCargos] = useState([]);
     
     useEffect(() => {
-        fetchData();
+        fetchData(1);
     }, []);
 
-    const fetchData = async () => {
-
+    const fetchData = async (page = 1) => {
         try {
             const [asistRes, emplRes, cargoRes] = await Promise.all([
-                api.get('asistencias/'),
+                api.get(`asistencias/?page=${page}`),
                 api.get('empleados/'),
                 api.get('cargos/')
             ]);
-            // Sort asistencias latest first
-            setAsistencias(asistRes.data.sort((a,b) => b.id - a.id));
+            
+            // Handle Pagination Response
+            if(asistRes.data.results) {
+                setAsistencias(asistRes.data.results);
+                setPagination({
+                    current: page,
+                    next: asistRes.data.next,
+                    previous: asistRes.data.previous,
+                    count: asistRes.data.count
+                });
+            } else {
+                // Fallback if not paginated (shouldn't happen with our changes)
+                setAsistencias(asistRes.data);
+            }
+
             setEmpleados(emplRes.data);
             setCargos(cargoRes.data);
         } catch (error) {
@@ -478,7 +561,7 @@ const AdminDashboard = () => {
 
             <div className="dashboard-content">
                 {tab === 'liquidacion' && <ReporteLiquidacion empleados={empleados} asistencias={asistencias} refreshData={fetchData} />}
-                {tab === 'asistencias' && <CrudAsistencias asistencias={asistencias} empleados={empleados} refreshData={fetchData} />}
+                {tab === 'asistencias' && <CrudAsistencias asistencias={asistencias} empleados={empleados} refreshData={fetchData} pagination={pagination} />}
                 {tab === 'empleados' && <CrudEmpleados empleados={empleados} cargos={cargos} refreshData={fetchData} />}
                 {tab === 'cargos' && <CrudCargos cargos={cargos} refreshData={fetchData} />}
             </div>
