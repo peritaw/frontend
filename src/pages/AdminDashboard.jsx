@@ -3,6 +3,13 @@ import React, { useEffect, useState } from 'react';
 import api from '../api';
 import './AdminDashboard.css';
 
+// --- HELPERS ---
+const formatDate = (dateString) => {
+    if (!dateString) return '';
+    const [year, month, day] = dateString.split('-');
+    return `${day}/${month}/${year}`;
+};
+
 // --- COMPONENTS ---
 
 const CrudCargos = ({ cargos, refreshData }) => {
@@ -280,7 +287,7 @@ const ReporteLiquidacion = ({ empleados, asistencias, refreshData }) => {
                                 <tbody>
                                     {registrosFiltrados.map(r => (
                                         <tr key={r.id}>
-                                            <td>{r.fecha}</td>
+                                            <td>{formatDate(r.fecha)}</td>
                                             <td>{r.hora_ingreso?.substring(0,5)} - {r.hora_salida?.substring(0,5)}</td>
                                             <td>{r.horas_trabajadas}</td>
                                             <td>${r.monto_total}</td>
@@ -316,7 +323,7 @@ const ReporteLiquidacion = ({ empleados, asistencias, refreshData }) => {
                     {asistencias.map(asis => (
                         <tr key={asis.id}>
                             <td>{asis.empleado_nombre}</td>
-                            <td>{asis.fecha}</td>
+                            <td>{formatDate(asis.fecha)}</td>
                             <td>{asis.monto_total ? `$${asis.monto_total}` : '-'}</td>
                             <td>
                                 {asis.pagado ? 
@@ -439,7 +446,6 @@ const CrudAsistencias = ({ asistencias, empleados, refreshData, pagination }) =>
                 <table>
                     <thead>
                         <tr>
-                            <th>ID</th>
                             <th>Empleado</th>
                             <th>Fecha</th>
                             <th>Entrada</th>
@@ -452,7 +458,6 @@ const CrudAsistencias = ({ asistencias, empleados, refreshData, pagination }) =>
                     <tbody>
                         {asistencias.map(a => (
                             <tr key={a.id} style={{backgroundColor: editingId===a.id ? 'rgba(251, 191, 36, 0.2)' : (a.pagado ? 'rgba(16, 185, 129, 0.15)' : 'transparent')}}>
-                                <td>{a.id}</td>
                                 <td>{a.empleado_nombre}</td>
                                 
                                 {editingId === a.id ? (
@@ -468,11 +473,11 @@ const CrudAsistencias = ({ asistencias, empleados, refreshData, pagination }) =>
                                     </>
                                 ) : (
                                     <>
-                                        <td>{a.fecha}</td>
+                                        <td>{formatDate(a.fecha)}</td>
                                         <td>{a.hora_ingreso?.substring(0,5)}</td>
                                         <td>{a.hora_salida?.substring(0,5) || <span style={{color:'red', fontWeight:'bold'}}>SIN SALIDA</span>}</td>
                                         <td>{a.horas_trabajadas}</td>
-                                        <td>{a.monto_total}</td>
+                                        <td>${a.monto_total}</td>
                                         <td>
                                             {!a.pagado && (
                                                 <button className="action-btn" onClick={()=>startEdit(a)}>Editar</button>
