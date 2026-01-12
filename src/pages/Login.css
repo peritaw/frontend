@@ -73,3 +73,16 @@ h1 {
     transform: translateY(-3px);
     box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
 }
+
+@media (max-width: 480px) {
+    .glass-card {
+        width: 100%;
+        max-width: 320px;
+        padding: 2rem;
+        margin: 0 1rem;
+    }
+
+    h1 {
+        font-size: 1.8rem;
+    }
+}

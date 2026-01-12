@@ -82,3 +82,30 @@ header h2 {
     padding: 1rem;
     border-radius: 10px;
 }
+
+@media (max-width: 768px) {
+    .home-container {
+        padding: 1rem;
+        /* Ensure it fits vertically on small phones */
+        align-items: center; 
+    }
+    
+    .glass-panel {
+        padding: 1.5rem;
+        max-width: 100%;
+    }
+
+    header h2 {
+        font-size: 1.5rem;
+    }
+
+    .scanner-wrapper {
+        min-height: 250px;
+        margin: 1.5rem 0;
+    }
+    
+    .btn-scan {
+        padding: 12px 25px;
+        font-size: 1rem;
+    }
+}
